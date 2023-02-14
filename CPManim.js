@@ -13,7 +13,7 @@
         icon: 'star',
         author: 'zerustu',
         description: 'convert blockbench animation to js files for 1.16 CPM',
-        version: '1.0.0',
+        version: '1.1.0',
         variant: 'both',
 
         onload() {
@@ -28,15 +28,15 @@
                     let bones = [];
                     let allbones = Project.groups;
                     let conditions = {
-                        "walk": "is_walking && !entity.isSprinting() && Pose == \"standing\" && !entity.isHurt() && !entity.isRiding()",
+                        "walk": "is_walking && !entity.isSprinting() && Pose == \"standing\" && !entity.isHurt() && !entity.isRiding() && !entity.isInWater()",
                         "run": "entity.isSprinting() && Pose == \"standing\" && !entity.isHurt() && !entity.isRiding()",
                         "climbing": "Pose == \"swimming\" && !entity.isInWater() && !entity.isHurt()",
                         "sneaking": "Pose == \"crouching\" && !is_walking && !entity.isHurt()",
                         "sneak": "Pose == \"crouching\" && is_walking && !entity.isHurt()",
-                        "swim": "Pose == \"swimming\" && entity.isInWater() && is_walking && !entity.isHurt()",
-                        "swim_stand": "Pose == \"standing\" && entity.isInWater() && !is_walking && !entity.isHurt()",
+                        "swim": "entity.isInWater() && entity.isSprinting()",
+                        "swim_stand": "entity.isInWater() && !entity.isSprinting()",
                         "attacked": "entity.isHurt()",
-                        "jump": "Pose == \"standing\" && !entity.isOnGround() && !entity.isHurt() && !entity.isRiding()",
+                        "jump": "Pose == \"standing\" && !entity.isOnGround() && !entity.isHurt() && !entity.isRiding() && !entity.isInWater()",
                         "fly": "Pose == \"elytra_flying\" && !entity.isHurt()",
                         "boat": "entity.isRiding() && !entity.isHurt()",
                         "use_righthand": "entity.getSwingProgress()",
@@ -45,7 +45,7 @@
                         "ride": "entity.isRiding() && !entity.isHurt()",
                         "ride_pig": "entity.isRiding() && !entity.isHurt()",
                         "sit": "entity.isRiding() && !entity.isHurt()",
-                        "idle": "!is_walking && Pose == \"standing\" && !entity.isHurt() && !entity.isRiding() && entity.isOnGround()",
+                        "idle": "!is_walking && Pose == \"standing\" && !entity.isHurt() && !entity.isRiding() && entity.isOnGround() && !entity.isInWater()",
                     };
                     let sitstates = ["boat", "ride", "sit", "ride_pig"];
                     var didsit = false;
@@ -68,9 +68,9 @@
                                     
                                 }
                             }
-                            else
+                            else //if (!Object.keys(Cbones).includes(realbone.name))
                             {
-                                position = [0,0,0];
+                                position[1] -= 24;
                             }
                             position[0] *= -1;
                             var rotation = [...realbone.rotation];
@@ -113,12 +113,20 @@
                         if (states.includes(anim.name)) {
                             if (!(sitstates.includes(anim.name) && didsit)) {
                                 animationcode += "    if(" + conditions[anim.name] + ") {  // " + anim.name + " \n";
-                                animationcode += ParseAnimation(anim) + "    }\n";
+                                animationcode += ParseAnimation(anim) + "                animated = true;\n    }\n";
                             }
                             if (sitstates.includes(anim.name)) {didsit = true;};
                         }
                         else {states.push(anim.name);};
                     });
+
+                    var have_default = false;
+                    var default_anim = Project.animations.find(anim => anim.name == "default");
+                    if (default_anim != undefined) {
+                        animationcode += "    if(!animated) {  // " + default_anim.name + " \n";
+                        animationcode += ParseAnimation(default_anim) + "    }\n";
+                        have_default = true;
+                    }
 
                     for (var c_bone in Cbones) {
                         if (Cbones[c_bone]) {
@@ -134,6 +142,7 @@
                     states.forEach(state => {
                         result += "timer_" + state + ", ";
                     });
+                    if (have_default) {result += "timer_default, "}
                     
                     for (var c_bone in Cbones) {
                         if (Cbones[c_bone]) {
@@ -141,7 +150,7 @@
                         }
                     }
 
-                    result += "walkingtest, Pose, is_walking, last_anim, anim_time, partial;\n\n" + 
+                    result += "walkingtest, Pose, is_walking, last_anim, anim_time, partial, animated;\n\n" + 
 
                     // animate funtion
                     "function animate(tick, partial, frames, length) {\n    if(length ==0) {\n        return [frames[1], frames[2], frames[3]];\n    }\n    var last = Math.floor(frames.length/4);\n    var time = (tick/20) % length + partial/20.;\n    for(var i = 1; i < last; i++) {\n        if (time >= frames[4*(i-1)] & time < frames[4*i]) {\n            var t = (time - frames[4*(i-1)]) / (frames[4*i] - frames[4*(i-1)]);\n            return [t*(frames[4*i+1] - frames[4*(i-1)+1]) + frames[4*(i-1)+1], t*(frames[4*i+2] - frames[4*(i-1)+2]) + frames[4*(i-1)+2], t*(frames[4*i+3] - frames[4*(i-1)+3]) + frames[4*(i-1)+3]];\n        }\n    }\n    return [frames[4*last-3],frames[4*last-2],frames[4*last-1]];\n}" + 
@@ -151,7 +160,7 @@
 
                     //get every pointer of bones
                     bones.forEach(bone => {
-                        result += "    pointer_" + bone + " = model.getBone(\"" + bone + "\");\n    " + bone + "_pos = [0,0,0]; \n    " + bone + "_rot = [0,0,0]; \n";
+                        result += "    pointer_" + bone + " = model.getBone(\"" + bone + "\");\n";
                     });
 
                     //get pointer of vanilla bones
@@ -163,7 +172,7 @@
                     //console.log(Cbones);
 
                     //set some variable
-                    result += "    walkingtest = entity.getLimbSwing(); \n    is_walking = false; \n    Pose = \"\"; \n    last_anim = \"\"\n    anim_time = 0;\n    partial = 0.;\n}\n\nfunction update(entity, model) {\n    Pose = entity.getPose();    anim_time = entity.getAge();\n    partial = entity.getPartial();\n";
+                    result += "    walkingtest = entity.getLimbSwing(); \n    is_walking = false; \n    Pose = \"\"; \n    last_anim = \"\"\n    anim_time = 0;\n    partial = 0.;\n    animated = false;\n}\n\nfunction update(entity, model) {\n    Pose = entity.getPose();    anim_time = entity.getAge();\n    partial = entity.getPartial();\n    animated = false;\n";
                     
                     //update function
                     bones.forEach(bone => {
@@ -176,9 +185,9 @@
                                 position[index] -= parent.origin[index]; 
                             }
                         }
-                        else
+                        else //if (!Object.keys(Cbones).includes(realbone.name))
                         {
-                            position = [0,0,0];
+                            position[1] -= 24;
                         }
                         position[0] *= -1;
                         var rotation =[...realbone.rotation];
@@ -222,7 +231,7 @@
             });
             
             export_action_zer = new Action('export_cpm_anim_zeru', {
-				name: 'Export CPM anim',
+				name: 'Export CPM animation',
 				description: '',
 				icon: 'star',
 				category: 'file',
@@ -241,16 +250,16 @@
                     id: "cpm_export",
                     draggable: true,
                     form: {
-                        head_c_text: {label: "head_c", type: 'info', text: Cbones["head_c"] ? "" : "no head_c bone found"},
-                        head_c: Cbones["head_c"] ? {label: Cbones["head_c"] == 1 ? "add head rotation" : "remove head rotation", type: 'checkbox', value: false} : "_",
-                        left_leg_c_text: {label: "left_leg_c", type: 'info', text: Cbones["left_leg_c"] ? "" : "no left_leg_c bone found"},
-                        left_leg_c: Cbones["left_leg_c"] ? {label: Cbones["left_leg_c"] == 1 ? "add default animation" : "remove default animation", type: 'checkbox', value: false} : "_",
-                        right_leg_c_text: {label: "right_leg_c", type: 'info', text: Cbones["right_leg_c"] ? "" : "no right_leg_c bone found"},
-                        right_leg_c: Cbones["right_leg_c"] ? {label: Cbones["right_leg_c"] == 1 ? "add default animation" : "remove default animation", type: 'checkbox', value: false} : "_",
-                        left_arm_c_text: {label: "left_arm_c", type: 'info', text: Cbones["left_arm_c"] ? "" : "no left_arm_c bone found"},
-                        left_arm_c: Cbones["left_arm_c"] ? {label: Cbones["left_arm_c"] == 1 ? "add default animation" : "remove default animation", type: 'checkbox', value: false} : "_",
-                        right_arm_c_text: {label: "right_arm_c", type: 'info', text: Cbones["right_arm_c"] ? "" : "no right_arm_c bone found"},
-                        right_arm_c: Cbones["right_arm_c"] ? {label: Cbones["right_arm_c"] == 1 ? "add default animation" : "remove default animation", type: 'checkbox', value: false} : "_"
+                        head_c_text: {label: "head_c", type: 'info', text: Cbones["head_c"] ? (Cbones["head_c"] == 1 ? "the bone is not a root bone, do you want to add the animation?" : "ok") : "no head_c bone found"},
+                        head_c: Cbones["head_c"] == 1 ? {label: "add head rotation", type: 'checkbox', value: false} : "_",
+                        left_leg_c_text: {label: "left_leg_c", type: 'info', text: Cbones["left_leg_c"] ? (Cbones["left_leg_c"] == 1 ? "the bone is not a root bone, do you want to add the animation?" : "ok") : "no left_leg_c bone found"},
+                        left_leg_c: Cbones["left_leg_c"] == 1 ? {label: "add default animation", type: 'checkbox', value: false} : "_",
+                        right_leg_c_text: {label: "right_leg_c", type: 'info', text: Cbones["right_leg_c"] ? (Cbones["right_leg_c"] == 1 ? "the bone is not a root bone, do you want to add the animation?" : "ok") : "no right_leg_c bone found"},
+                        right_leg_c: Cbones["right_leg_c"] == 1 ? {label: "add default animation", type: 'checkbox', value: false} : "_",
+                        left_arm_c_text: {label: "left_arm_c", type: 'info', text: Cbones["left_arm_c"] ? (Cbones["left_arm_c"] == 1 ? "the bone is not a root bone, do you want to add the animation?" : "ok") : "no left_arm_c bone found"},
+                        left_arm_c: Cbones["left_arm_c"] ==1 ? {label: "add default animation", type: 'checkbox', value: false} : "_",
+                        right_arm_c_text: {label: "right_arm_c", type: 'info', text: Cbones["right_arm_c"] ? (Cbones["right_arm_c"] == 1 ? "the bone is not a root bone, do you want to add the animation?" : "ok") : "no right_arm_c bone found"},
+                        right_arm_c: Cbones["right_arm_c"] == 1 ? {label: "add default animation", type: 'checkbox', value: false} : "_"
                     },
                     onConfirm: function(formData) {
                         this.hide();
