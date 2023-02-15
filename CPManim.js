@@ -13,7 +13,7 @@
         icon: 'star',
         author: 'zerustu',
         description: 'convert blockbench animation to js files for 1.16 CPM',
-        version: '1.1.0',
+        version: '1.2.0',
         variant: 'both',
 
         onload() {
@@ -79,8 +79,8 @@
                             //var temp = rotation[1];
                             //rotation[1] = rotation[2];
                             //rotation[2] = -temp;
-                            if (!bones.includes(animator.name)) {bones.push(animator.name);};
                             if (animator.position.length > 0) {
+                                if (!bones.includes(animator.name)) {bones.push(animator.name);};
                                 lines += "        " + animator.name + "_pos = animate(anim_time - timer_" + animation.name + ", partial,[";
                                 animator.position.forEach(keyframe => {
                                     lines += keyframe.getTimecodeString() + ','
@@ -93,6 +93,7 @@
                                 lines += "-1]," + animation.length + ");\n";
                             }
                             if (animator.rotation.length > 0) {
+                                if (!bones.includes(animator.name)) {bones.push(animator.name);};
                                 lines += "        " + animator.name + "_rot = animate(anim_time - timer_" + animation.name + ", partial,[";
                                 animator.rotation.forEach(keyframe => {
                                     lines += keyframe.getTimecodeString() + ','
