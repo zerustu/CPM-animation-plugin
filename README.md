@@ -1,6 +1,6 @@
 # CPM-animation-plugin
 This is a blockbench plugin to generate custom player model animation file from blockbench (bedrock format) animation.  
-Another functionality is allows to have _c bone that are not root bone (and remove _c bone animation but this isn't recommended).  
+Another functionality is allows to have _c bone that are not root bone.  
 
 The expected format is based on the format wanted by 'yes Steve model' mod.
 
